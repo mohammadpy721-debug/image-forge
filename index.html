@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Image Forge</title>
+<style>
+  :root { --bg:#f7f5ff; --fg:#1e1b4b; --card:#ffffff; --accent:#7c3aed; --accent2:#06b6d4; --muted:#6b7280; --border:#ddd6fe; --good:#16a34a; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#0a0616; --fg:#ede9fe; --card:#150c2b; --accent:#a78bfa; --accent2:#22d3ee; --muted:#9ca3af; --border:#3b2a6b; --good:#4ade80; } }
+  :root[data-theme="dark"] { --bg:#0a0616; --fg:#ede9fe; --card:#150c2b; --accent:#a78bfa; --accent2:#22d3ee; --muted:#9ca3af; --border:#3b2a6b; --good:#4ade80; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; background:radial-gradient(1200px 500px at 50% -10%, rgba(124,58,237,.25), transparent), var(--bg); color:var(--fg); font-family:system-ui,sans-serif; padding:24px 16px; }
+  .wrap { max-width:960px; margin:0 auto; }
+  header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+  h1 { margin:0; font-size:1.6rem; background:linear-gradient(90deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:18px; margin-bottom:16px; }
+  .drop { border:2px dashed var(--accent); border-radius:14px; padding:34px 16px; text-align:center; cursor:pointer; transition:.2s; }
+  .drop.over, .drop:hover { background:rgba(124,58,237,.08); }
+  .drop small { color:var(--muted); display:block; margin-top:6px; }
+  .controls { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-top:14px; }
+  label { font-size:.85rem; color:var(--muted); display:block; margin-bottom:6px; }
+  select, input[type=number] { width:100%; padding:9px; border-radius:10px; border:1px solid var(--border); background:transparent; color:var(--fg); font:inherit; }
+  input[type=range] { width:100%; accent-color:var(--accent); }
+  button { font:inherit; padding:10px 16px; border-radius:10px; border:none; background:linear-gradient(90deg,var(--accent),var(--accent2)); color:#fff; cursor:pointer; font-weight:600; }
+  button.ghost { background:transparent; color:var(--accent); border:1px solid var(--accent); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
+  .totals { margin-top:10px; font-size:.95rem; color:var(--muted); }
+  .totals b { color:var(--good); }
+  .list { display:grid; gap:12px; }
+  .item { display:grid; grid-template-columns:110px 1fr auto; gap:14px; align-items:center; border:1px solid var(--border); border-radius:12px; padding:10px; }
+  @media (max-width:600px) { .item { grid-template-columns:80px 1fr; } .item .dl { grid-column:1 / -1; } }
+  .thumb { width:110px; height:90px; object-fit:cover; border-radius:8px; background:#0002; }
+  .name { font-weight:600; word-break:break-all; }
+  .meta { font-size:.85rem; color:var(--muted); margin-top:4px; }
+  .save { color:var(--good); font-weight:700; }
+  .compare { position:relative; width:100%; max-width:520px; aspect-ratio:4/3; border-radius:12px; overflow:hidden; margin-top:10px; user-select:none; }
+  .compare img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#0003; }
+  .compare .after { clip-path:inset(0 0 0 var(--pos,50%)); }
+  .compare .handle { position:absolute; top:0; bottom:0; left:var(--pos,50%); width:3px; background:#fff; box-shadow:0 0 12px var(--accent); transform:translateX(-50%); pointer-events:none; }
+  .compare input { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:ew-resize; margin:0; }
+  .tag { display:inline-block; font-size:.75rem; padding:2px 8px; border-radius:999px; background:rgba(124,58,237,.15); color:var(--accent); margin-left:6px; }
+  .empty { text-align:center; color:var(--muted); padding:20px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>⚡ Image Forge</h1>
+    <button class="ghost" id="theme">🌓</button>
+  </header>
+
+  <section class="card">
+    <input id="file" type="file" accept="image/*" multiple hidden>
+    <div class="drop" id="drop">
+      <strong>عکس‌ها رو اینجا بکش یا کلیک کن</strong>
+      <small>JPG، PNG، WebP، GIF · پردازش کاملاً داخل مرورگر، بدون آپلود</small>
+    </div>
+
+    <div class="controls">
+      <div>
+        <label for="format">فرمت خروجی</label>
+        <select id="format">
+          <option value="image/webp" selected>WebP (پیشنهادی)</option>
+          <option value="image/jpeg">JPEG</option>
+          <option value="image/png">PNG</option>
+        </select>
+      </div>
+      <div>
+        <label for="quality">کیفیت: <span id="qv">80</span>%</label>
+        <input id="quality" type="range" min="10" max="100" value="80">
+      </div>
+      <div>
+        <label for="maxw">حداکثر عرض (px)</label>
+        <input id="maxw" type="number" min="64" step="64" value="1600">
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="run" disabled>فشرده‌سازی همه</button>
+      <button class="ghost" id="dlall" disabled>دانلود همه</button>
+      <button class="ghost" id="clear">پاک کردن</button>
+    </div>
+    <div class="totals" id="totals"></div>
+  </section>
+
+  <section class="card">
+    <div class="list" id="list"><div class="empty">هنوز عکسی اضافه نشده.</div></div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const drop = $('drop'), fileInput = $('file'), list = $('list');
+  let items = []; // {id, file, name, origSize, outBlob, outUrl, origUrl, outW, outH}
+  let nextId = 1;
+
+  const fmtBytes = n => n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(2) + ' MB';
+  const extFor = type => type === 'image/jpeg' ? 'jpg' : type === 'image/png' ? 'png' : 'webp';
+
+  function addFiles(files) {
+    for (const f of files) {
+      if (!f.type.startsWith('image/')) continue;
+      items.push({ id: nextId++, file: f, name: f.name, origSize: f.size, origUrl: URL.createObjectURL(f), outBlob: null, outUrl: null, outW: 0, outH: 0 });
+    }
+    render();
+  }
+
+  function loadImage(src) {
+    return new Promise((res, rej) => { const img = new Image(); img.onload = () => res(img); img.onerror = rej; img.src = src; });
+  }
+
+  async function compress(item) {
+    const img = await loadImage(item.origUrl);
+    const maxW = Math.max(64, +$('maxw').value || 1600);
+    const scale = Math.min(1, maxW / img.naturalWidth);
+    const w = Math.round(img.naturalWidth * scale), h = Math.round(img.naturalHeight * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    const type = $('format').value;
+    if (type !== 'image/png') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); }
+    ctx.drawImage(img, 0, 0, w, h);
+    const q = +$('quality').value / 100;
+    const blob = await new Promise(res => canvas.toBlob(res, type, type === 'image/png' ? undefined : q));
+    if (item.outUrl) URL.revokeObjectURL(item.outUrl);
+    item.outBlob = blob;
+    item.outUrl = URL.createObjectURL(blob);
+    item.outW = w; item.outH = h;
+  }
+
+  async function runAll() {
+    $('run').disabled = true;
+    $('run').textContent = 'در حال پردازش…';
+    for (const it of items) {
+      try { await compress(it); } catch (e) { it.outBlob = null; }
+    }
+    $('run').disabled = false;
+    $('run').textContent = 'فشرده‌سازی همه';
+    render();
+  }
+
+  function removeItem(id) {
+    const i = items.findIndex(x => x.id === id);
+    if (i >= 0) { URL.revokeObjectURL(items[i].origUrl); if (items[i].outUrl) URL.revokeObjectURL(items[i].outUrl); items.splice(i, 1); }
+    render();
+  }
+
+  function downloadOne(it) {
+    const a = document.createElement('a');
+    const base = it.name.replace(/\.[^.]+$/, '');
+    a.href = it.outUrl; a.download = `${base}.${extFor($('format').value)}`;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+
+  function render() {
+    const done = items.filter(i => i.outBlob);
+    $('run').disabled = items.length === 0;
+    $('dlall').disabled = done.length === 0;
+    const before = items.reduce((s, i) => s + i.origSize, 0);
+    const after = done.reduce((s, i) => s + i.outBlob.size, 0);
+    if (done.length) {
+      const saved = before - after;
+      const pct = before ? Math.round((saved / before) * 100) : 0;
+      $('totals').innerHTML = `${items.length} عکس · قبل: ${fmtBytes(before)} · بعد: ${fmtBytes(after)} · <b>${pct >= 0 ? 'صرفه‌جویی ' + pct + '%' : 'افزایش ' + Math.abs(pct) + '%'}</b>`;
+    } else {
+      $('totals').textContent = items.length ? `${items.length} عکس آماده‌ی فشرده‌سازی` : '';
+    }
+
+    if (!items.length) { list.innerHTML = '<div class="empty">هنوز عکسی اضافه نشده.</div>'; return; }
+    list.innerHTML = '';
+    for (const it of items) {
+      const row = document.createElement('div');
+      row.className = 'item';
+      const compareHtml = it.outUrl ? `
+        <div class="compare" style="--pos:50%">
+          <img src="${it.origUrl}" alt="original">
+          <img class="after" src="${it.outUrl}" alt="compressed">
+          <div class="handle"></div>
+          <input type="range" min="0" max="100" value="50" aria-label="مقایسه">
+        </div>` : '';
+      const info = it.outBlob
+        ? `${fmtBytes(it.origSize)} → <span class="save">${fmtBytes(it.outBlob.size)}</span>
+           <span class="tag">${it.outW}×${it.outH}</span>`
+        : `${fmtBytes(it.origSize)} <span class="tag">هنوز فشرده نشده</span>`;
+      row.innerHTML = `
+        <img class="thumb" src="${it.outUrl || it.origUrl}" alt="">
+        <div>
+          <div class="name"></div>
+          <div class="meta">${info}</div>
+          ${compareHtml}
+        </div>
+        <div class="dl" style="display:flex;flex-direction:column;gap:8px"></div>`;
+      row.querySelector('.name').textContent = it.name;
+      const actions = row.querySelector('.dl');
+      if (it.outBlob) {
+        const b = document.createElement('button'); b.textContent = 'دانلود'; b.onclick = () => downloadOne(it); actions.appendChild(b);
+      }
+      const rm = document.createElement('button'); rm.className = 'ghost'; rm.textContent = 'حذف'; rm.onclick = () => removeItem(it.id); actions.appendChild(rm);
+      if (it.outUrl) {
+        const cmp = row.querySelector('.compare');
+        const range = cmp.querySelector('input');
+        range.addEventListener('input', () => cmp.style.setProperty('--pos', range.value + '%'));
+      }
+      list.appendChild(row);
+    }
+  }
+
+  drop.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', e => { addFiles(e.target.files); fileInput.value = ''; });
+  ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', e => addFiles(e.dataTransfer.files));
+
+  $('quality').addEventListener('input', e => $('qv').textContent = e.target.value);
+  $('run').addEventListener('click', runAll);
+  $('dlall').addEventListener('click', () => items.filter(i => i.outBlob).forEach((it, idx) => setTimeout(() => downloadOne(it), idx * 150)));
+  $('clear').addEventListener('click', () => { items.forEach(i => { URL.revokeObjectURL(i.origUrl); if (i.outUrl) URL.revokeObjectURL(i.outUrl); }); items = []; render(); });
+  ['format','quality','maxw'].forEach(id => $(id).addEventListener('change', () => { items.forEach(i => { i.outBlob = null; }); render(); }));
+
+  $('theme').addEventListener('click', () => {
+    const root = document.documentElement;
+    const dark = root.dataset.theme === 'dark' || (!root.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
+    root.dataset.theme = dark ? 'light' : 'dark';
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
